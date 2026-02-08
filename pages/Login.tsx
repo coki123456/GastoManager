@@ -1,13 +1,31 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChefHat, Mail, Lock, Eye } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    navigate('/dashboard');
+    setLoading(true);
+    setError(null);
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+    } else {
+      navigate('/dashboard');
+    }
   };
 
   return (
@@ -34,6 +52,12 @@ const Login: React.FC = () => {
             <p className="text-text-secondary">Gestiona los costos y ventas de tu negocio</p>
           </div>
 
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 text-red-500 rounded-lg text-sm font-medium">
+              {error}
+            </div>
+          )}
+
           <button className="w-full flex items-center justify-center gap-3 border border-gray-200 rounded-lg py-3 hover:bg-gray-50 transition-colors font-bold text-text-main mb-6">
             <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
             Continuar con Google
@@ -48,10 +72,13 @@ const Login: React.FC = () => {
             <div>
               <label className="block text-sm font-medium text-text-main mb-1.5">Correo electrónico</label>
               <div className="relative">
-                <input 
-                  type="email" 
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-4 pr-10 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
                   placeholder="ejemplo@restaurante.com"
+                  required
                 />
                 <Mail className="absolute right-3 top-3 text-gray-400" size={20} />
               </div>
@@ -63,10 +90,13 @@ const Login: React.FC = () => {
                 <a href="#" className="text-sm font-bold text-primary-dark hover:underline">¿Olvidaste tu contraseña?</a>
               </div>
               <div className="relative">
-                <input 
-                  type="password" 
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-4 pr-10 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
                   placeholder="Ingresa tu contraseña"
+                  required
                 />
                 <button type="button" className="absolute right-3 top-3 text-gray-400 hover:text-gray-600">
                   <Eye size={20} />
@@ -74,8 +104,8 @@ const Login: React.FC = () => {
               </div>
             </div>
 
-            <button type="submit" className="mt-2 w-full bg-primary hover:bg-primary-dark text-text-main py-3 rounded-lg font-bold text-lg transition-colors shadow-sm">
-              Iniciar Sesión
+            <button type="submit" disabled={loading} className="mt-2 w-full bg-primary hover:bg-primary-dark text-text-main py-3 rounded-lg font-bold text-lg transition-colors shadow-sm disabled:opacity-50">
+              {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </button>
           </form>
 

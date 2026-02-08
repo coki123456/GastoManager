@@ -5,7 +5,11 @@ import { useInventoryStore } from '../store/useInventoryStore';
 
 const Inventory: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { ingredients } = useInventoryStore();
+  const { ingredients, fetchIngredients } = useInventoryStore();
+
+  React.useEffect(() => {
+    fetchIngredients();
+  }, [fetchIngredients]);
 
   const totalValue = ingredients.reduce((acc, item) => acc + (item.stock * item.price), 0);
   const lowStockItems = ingredients.filter(item => item.status === 'Bajo Stock').length;
@@ -13,7 +17,7 @@ const Inventory: React.FC = () => {
   return (
     <div className="flex flex-col gap-6">
       <AddIngredientModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-      
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black text-text-main">Inventario de Ingredientes</h1>
@@ -23,7 +27,7 @@ const Inventory: React.FC = () => {
           <button className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 font-semibold text-sm transition-colors">
             <RefreshCw size={18} /> Actualizar Stock
           </button>
-          <button 
+          <button
             onClick={() => setIsModalOpen(true)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary hover:bg-primary-dark font-bold text-text-main text-sm transition-colors shadow-sm"
           >
@@ -39,7 +43,7 @@ const Inventory: React.FC = () => {
             <input type="text" className="w-full bg-transparent outline-none text-sm" placeholder="Buscar por ingrediente, proveedor..." />
           </div>
         </div>
-        
+
         <div className="bg-white rounded-xl border border-gray-200 p-3 flex items-center justify-between shadow-sm">
           <div>
             <p className="text-xs font-bold text-gray-500 uppercase">Valor Total</p>
@@ -76,7 +80,7 @@ const Inventory: React.FC = () => {
                 <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-gray-100 bg-cover bg-center" style={{backgroundImage: `url('${item.image}')`}}></div>
+                      <div className="h-10 w-10 rounded-lg bg-gray-100 bg-cover bg-center" style={{ backgroundImage: `url('${item.image}')` }}></div>
                       <div>
                         <p className="font-bold text-text-main text-sm">{item.name}</p>
                         <p className="text-xs text-gray-500 capitalize">{item.category}</p>
