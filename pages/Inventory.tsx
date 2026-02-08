@@ -5,7 +5,7 @@ import { useInventoryStore } from '../store/useInventoryStore';
 
 const Inventory: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { ingredients, fetchIngredients } = useInventoryStore();
+  const { ingredients, fetchIngredients, isLoading } = useInventoryStore();
 
   React.useEffect(() => {
     fetchIngredients();
@@ -13,6 +13,14 @@ const Inventory: React.FC = () => {
 
   const totalValue = ingredients.reduce((acc, item) => acc + (item.stock * item.price), 0);
   const lowStockItems = ingredients.filter(item => item.status === 'Bajo Stock').length;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">

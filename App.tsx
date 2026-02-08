@@ -10,6 +10,8 @@ import POS from './pages/POS';
 import SalesHistory from './pages/SalesHistory';
 import Settings from './pages/Settings';
 
+import ProtectedRoute from './components/ProtectedRoute';
+
 const App: React.FC = () => {
   return (
     <HashRouter>
@@ -18,15 +20,17 @@ const App: React.FC = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
-        {/* Protected Routes (Wrapped in Layout) */}
-        <Route path="/" element={<DashboardLayout />}>
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<DashboardReports />} />
-          <Route path="inventory" element={<Inventory />} />
-          <Route path="calculator" element={<CostCalculator />} />
-          <Route path="pos" element={<POS />} />
-          <Route path="sales" element={<SalesHistory />} />
-          <Route path="settings" element={<Settings />} />
+        {/* Protected Routes */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/" element={<DashboardLayout />}>
+            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route path="dashboard" element={<DashboardReports />} />
+            <Route path="inventory" element={<Inventory />} />
+            <Route path="calculator" element={<CostCalculator />} />
+            <Route path="pos" element={<POS />} />
+            <Route path="sales" element={<SalesHistory />} />
+            <Route path="settings" element={<Settings />} />
+          </Route>
         </Route>
 
         {/* Fallback */}

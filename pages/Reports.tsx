@@ -1,126 +1,205 @@
-import React from 'react';
-import { TrendingUp, ArrowUp, DollarSign, ShoppingCart, Percent, Lightbulb, Calendar } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { DollarSign, ShoppingCart, TrendingUp, AlertTriangle, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-const salesData = [
-  { day: 'Lun', sales: 4000 },
-  { day: 'Mar', sales: 3000 },
-  { day: 'Mié', sales: 5000 },
-  { day: 'Jue', sales: 2780 },
-  { day: 'Vie', sales: 6890 },
-  { day: 'Sáb', sales: 8390 },
-  { day: 'Dom', sales: 7490 },
-];
-
-const totalWeeklySales = salesData.reduce((acc, curr) => acc + curr.sales, 0);
-const averageDailySales = Math.round(totalWeeklySales / salesData.length);
-const bestDay = salesData.reduce((prev, current) => (prev.sales > current.sales) ? prev : current);
-
-const topProducts = [
-  { name: 'Hamburguesa Especial', cost: 4.50, price: 12.99, margin: 65 },
-  { name: 'Limonada de Coco', cost: 1.20, price: 4.50, margin: 73 },
-  { name: 'Pasta Carbonara', cost: 3.80, price: 14.00, margin: 72 },
-  { name: 'Tiramisú Casero', cost: 2.10, price: 6.50, margin: 67 },
-];
+// Initial state
+const initialStats = {
+  salesToday: 0,
+  ordersToday: 0,
+  revenueMonth: 0,
+  lowStockItems: 0
+};
 
 const DashboardReports: React.FC = () => {
+  const [stats, setStats] = useState(initialStats);
+  const [loading, setLoading] = useState(true);
+  const [salesData, setSalesData] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // 1. Sales Today
+      const { data: salesTodayData, error: salesError } = await supabase
+        .from('sales')
+        .select('total')
+        .gte('created_at', today.toISOString());
+
+      if (salesError) throw salesError;
+
+      const salesToday = salesTodayData ? salesTodayData.reduce((acc, curr) => acc + curr.total, 0) : 0;
+      const ordersToday = salesTodayData ? salesTodayData.length : 0;
+
+      // 2. Low Stock Items
+      const { data: ingredientsData, error: ingError } = await supabase
+        .from('ingredients')
+        .select('stock, minStock');
+
+      if (ingError) throw ingError;
+
+      const lowStockItems = ingredientsData ? ingredientsData.filter((i: any) => i.stock <= i.minStock).length : 0;
+
+      // 3. Fake Chart Data (since we don't have months of history)
+      const mockChartData = [
+        { name: 'Lun', venta: salesToday * 0.4 },
+        { name: 'Mar', venta: salesToday * 0.6 },
+        { name: 'Mie', venta: salesToday * 0.3 },
+        { name: 'Jue', venta: salesToday * 0.8 },
+        { name: 'Vie', venta: salesToday * 0.9 },
+        { name: 'Sab', venta: salesToday * 1.2 },
+        { name: 'Dom', venta: salesToday }
+      ];
+      setSalesData(mockChartData);
+
+      setStats({
+        salesToday,
+        ordersToday,
+        revenueMonth: salesToday * 30, // Projection
+        lowStockItems
+      });
+
+    } catch (error) {
+      console.error("Error fetching dashboard data", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cards = [
+    {
+      title: 'Ventas Hoy',
+      value: `$${stats.salesToday.toFixed(2)}`,
+      icon: DollarSign,
+      trend: '+12.5%',
+      positive: true,
+      color: 'bg-green-100 text-green-600'
+    },
+    {
+      title: 'Pedidos Hoy',
+      value: stats.ordersToday.toString(),
+      icon: ShoppingCart,
+      trend: '+5.2%',
+      positive: true,
+      color: 'bg-blue-100 text-blue-600'
+    },
+    {
+      title: 'Ingresos Mes',
+      value: `$${stats.revenueMonth.toFixed(2)}`,
+      icon: TrendingUp,
+      trend: '+2.4%',
+      positive: true,
+      color: 'bg-purple-100 text-purple-600'
+    },
+    {
+      title: 'Stock Bajo',
+      value: stats.lowStockItems.toString(),
+      icon: AlertTriangle,
+      trend: 'Requiere Atención',
+      positive: false,
+      color: 'bg-red-100 text-red-600'
+    },
+  ];
+
   return (
-    <div className="flex flex-col gap-6">
-      {/* Header Controls */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-text-main">Reportes y Estadísticas</h1>
-          <p className="text-gray-500 mt-1">Analiza el rendimiento detallado de tu negocio.</p>
+          <h1 className="text-3xl font-black text-text-main">Dashboard</h1>
+          <p className="text-gray-500">Resumen general de tu negocio</p>
         </div>
-        <div className="flex bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
-          <button className="px-3 py-1.5 text-xs font-medium rounded hover:bg-gray-100 text-gray-600">Hoy</button>
-          <button className="px-3 py-1.5 text-xs font-medium rounded bg-primary text-text-main font-bold shadow-sm">Esta Semana</button>
-          <button className="px-3 py-1.5 text-xs font-medium rounded hover:bg-gray-100 text-gray-600">Este Mes</button>
+        <div className="text-sm font-medium text-gray-500 bg-white px-4 py-2 rounded-lg border border-gray-200">
+          Última actualización: {new Date().toLocaleTimeString()}
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm relative overflow-hidden group hover:border-primary/50 transition-colors">
-          <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><DollarSign size={64} /></div>
-          <p className="text-gray-500 text-sm font-medium mb-1">Ventas Totales</p>
-          <div className="flex items-end gap-3">
-            <h3 className="text-2xl font-bold text-text-main">$12,450</h3>
-            <span className="flex items-center text-xs font-bold text-green-600 bg-green-100 px-1.5 py-0.5 rounded mb-1">
-              <TrendingUp size={14} className="mr-0.5" /> +15%
-            </span>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {cards.map((card, index) => (
+          <div key={index} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex justify-between items-start mb-4">
+              <div className={`p-3 rounded-xl ${card.color}`}>
+                <card.icon size={24} />
+              </div>
+              <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full ${card.positive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                {card.positive ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+                {card.trend}
+              </div>
+            </div>
+            <div>
+              <div className="text-sm font-medium text-gray-500 mb-1">{card.title}</div>
+              <div className="text-2xl font-black text-text-main">{loading ? '...' : card.value}</div>
+            </div>
           </div>
-        </div>
-
-        <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm relative overflow-hidden group hover:border-primary/50 transition-colors">
-          <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><ShoppingCart size={64} /></div>
-          <p className="text-gray-500 text-sm font-medium mb-1">Costos Totales</p>
-          <div className="flex items-end gap-3">
-            <h3 className="text-2xl font-bold text-text-main">$8,200</h3>
-            <span className="flex items-center text-xs font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded mb-1">
-              <TrendingUp size={14} className="mr-0.5" /> +5%
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm relative overflow-hidden group hover:border-primary/50 transition-colors">
-          <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><DollarSign size={64} /></div>
-          <p className="text-gray-500 text-sm font-medium mb-1">Beneficio Neto</p>
-          <div className="flex items-end gap-3">
-            <h3 className="text-2xl font-bold text-text-main">$4,250</h3>
-            <span className="flex items-center text-xs font-bold text-primary-dark bg-primary/20 px-1.5 py-0.5 rounded mb-1">
-              <TrendingUp size={14} className="mr-0.5" /> +22%
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm relative overflow-hidden group hover:border-primary/50 transition-colors">
-          <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><Percent size={64} /></div>
-          <p className="text-gray-500 text-sm font-medium mb-1">Margen Promedio</p>
-          <div className="flex items-end gap-3">
-            <h3 className="text-2xl font-bold text-text-main">34.1%</h3>
-            <span className="flex items-center text-xs font-bold text-primary-dark bg-primary/20 px-1.5 py-0.5 rounded mb-1">
-              <ArrowUp size={14} className="mr-0.5" /> +2.5%
-            </span>
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* Weekly Sales Summary (Replaces Charts) */}
-      <div className="bg-white rounded-xl p-8 border border-gray-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
-        <div className="absolute right-0 top-0 h-full w-1/3 bg-gradient-to-l from-primary/5 to-transparent pointer-events-none"></div>
-        <div className="flex flex-col gap-2 relative z-10">
-            <div className="flex items-center gap-3">
-               <div className="p-3 bg-primary/10 rounded-xl text-primary-dark shadow-sm">
-                  <Calendar size={24} />
-               </div>
-               <div>
-                  <h3 className="text-lg font-bold text-text-main leading-tight">Ventas de la Semana</h3>
-                  <p className="text-xs text-gray-500">Resumen consolidado de ingresos</p>
-               </div>
-            </div>
-            <div className="mt-2">
-                <p className="text-5xl font-black text-text-main tracking-tight">${totalWeeklySales.toLocaleString()}</p>
-            </div>
+      {/* Charts Section */}
+      <div className="grid lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-lg font-bold text-text-main">Tendencia de Ventas (Semanal)</h3>
+          </div>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={salesData}>
+                <defs>
+                  <linearGradient id="colorVenta" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#1E1E1E" stopOpacity={0.1} />
+                    <stop offset="95%" stopColor="#1E1E1E" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 12 }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 12 }} tickFormatter={(value) => `$${value}`} />
+                <Tooltip
+                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                />
+                <Area type="monotone" dataKey="venta" stroke="#1E1E1E" strokeWidth={3} fillOpacity={1} fill="url(#colorVenta)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-          
-        <div className="flex flex-wrap justify-center md:justify-end gap-8 relative z-10">
-            <div className="text-right border-r border-gray-100 pr-8 last:border-0 last:pr-0">
-                <p className="text-xs font-bold text-gray-400 uppercase mb-1 tracking-wider">Mejor Día</p>
-                <p className="text-2xl font-bold text-text-main">{bestDay.day}</p>
-                <p className="text-sm text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded-full inline-block mt-1">${bestDay.sales.toLocaleString()}</p>
+
+        <div className="bg-text-main text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
+          {/* Decorative Background */}
+          <div className="absolute -right-10 -top-10 w-40 h-40 bg-primary/20 rounded-full blur-3xl"></div>
+          <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-blue-500/20 rounded-full blur-3xl"></div>
+
+          <div className="relative z-10 h-full flex flex-col justify-between text-center items-center py-8">
+            <div>
+              <h3 className="text-xl font-bold mb-2">GastroManager Pro</h3>
+              <p className="text-gray-400 text-sm">Versión 1.0.0</p>
             </div>
-            <div className="text-right">
-                <p className="text-xs font-bold text-gray-400 uppercase mb-1 tracking-wider">Promedio Diario</p>
-                <p className="text-2xl font-bold text-text-main">${averageDailySales.toLocaleString()}</p>
-                 <p className="text-sm text-gray-500 font-medium mt-1 flex items-center justify-end gap-1">
-                    <TrendingUp size={14} className="text-primary-dark" /> Estable
-                 </p>
+
+            <div className="p-4 bg-white/10 rounded-2xl backdrop-blur-md border border-white/10 w-full max-w-[200px]">
+              <div className="text-xs text-gray-400 uppercase font-bold mb-1">Estado del Sistema</div>
+              <div className="flex items-center justify-center gap-2 text-green-400 font-bold">
+                <div className="w-2 h-2 bg-green-400 rounded-full relative">
+                  <div className="absolute inset-0 bg-green-400 rounded-full animate-ping"></div>
+                </div>
+                En Línea
+              </div>
             </div>
+
+            <div className="text-center">
+              <p className="text-sm text-gray-400 mb-4">¿Necesitas ayuda?</p>
+              <button className="bg-white text-text-main px-6 py-3 rounded-xl font-bold text-sm hover:bg-gray-100 transition-colors w-full">
+                Contactar Soporte
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Bottom Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      < div className="grid grid-cols-1 lg:grid-cols-3 gap-6" >
         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="p-6 border-b border-gray-100 flex justify-between items-center">
             <h3 className="text-lg font-bold text-text-main">Productos más Rentables</h3>
@@ -137,7 +216,13 @@ const DashboardReports: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {topProducts.map((p) => (
+                {/* Placeholder for top products */}
+                {[
+                  { name: 'Café Latte', cost: 1.50, price: 4.00, margin: 62.5 },
+                  { name: 'Sandwich de Pollo', cost: 2.00, price: 6.50, margin: 69.23 },
+                  { name: 'Jugo Natural', cost: 1.00, price: 3.50, margin: 71.43 },
+                  { name: 'Tarta de Manzana', cost: 1.20, price: 4.50, margin: 73.33 },
+                ].map((p) => (
                   <tr key={p.name} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 font-medium text-text-main">{p.name}</td>
                     <td className="px-6 py-4 text-gray-500">${p.cost.toFixed(2)}</td>
@@ -165,13 +250,13 @@ const DashboardReports: React.FC = () => {
                     <span className="text-sm font-bold text-text-main">${item.amount.toLocaleString()}</span>
                   </div>
                   <div className="w-full bg-gray-100 rounded-full h-2">
-                    <div className={`${item.color} h-2 rounded-full`} style={{width: item.width}}></div>
+                    <div className={`${item.color} h-2 rounded-full`} style={{ width: item.width }}></div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
-          
+
           <div className="mt-8 p-4 bg-yellow-50 rounded-lg border border-yellow-100 flex gap-3">
             <Lightbulb className="text-yellow-600 flex-shrink-0" size={20} />
             <p className="text-xs text-yellow-800 leading-relaxed">
@@ -179,8 +264,8 @@ const DashboardReports: React.FC = () => {
             </p>
           </div>
         </div>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 };
 
