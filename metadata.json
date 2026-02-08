@@ -1,0 +1,5 @@
+{
+  "name": "GastroManager",
+  "description": "Una aplicación profesional de gestión para restaurantes que incluye punto de venta, inventario, costos y reportes.",
+  "requestFramePermissions": []
+}
