@@ -7,6 +7,15 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
+
+# Add ARGs for build time variables
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+
+# Set them as ENV variables so Vite can see them
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+
 RUN npm run build
 
 # Production Stage
