@@ -40,11 +40,11 @@ const DashboardReports: React.FC = () => {
       // 2. Low Stock Items
       const { data: ingredientsData, error: ingError } = await supabase
         .from('ingredients')
-        .select('stock, minStock');
+        .select('stock, min_stock');
 
       if (ingError) throw ingError;
 
-      const lowStockItems = ingredientsData ? ingredientsData.filter((i: any) => i.stock <= i.minStock).length : 0;
+      const lowStockItems = ingredientsData ? ingredientsData.filter((i: any) => i.stock <= i.min_stock).length : 0;
 
       // 3. Fake Chart Data (since we don't have months of history)
       const mockChartData = [
@@ -146,7 +146,7 @@ const DashboardReports: React.FC = () => {
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-bold text-text-main">Tendencia de Ventas (Semanal)</h3>
           </div>
-          <div className="h-[300px] w-full">
+          <div className="h-[300px] w-full" style={{ minHeight: '300px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={salesData}>
                 <defs>
