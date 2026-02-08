@@ -4,7 +4,7 @@ export interface Ingredient {
   category: string;
   stock: number;
   unit: string;
-  minStock: number;
+  min_stock: number;
   price: number;
   supplier: string;
   image: string;

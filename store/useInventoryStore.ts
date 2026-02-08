@@ -38,7 +38,7 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   addIngredient: async (newIngredient) => {
     set({ isLoading: true, error: null });
     try {
-      const status = newIngredient.stock <= newIngredient.minStock ? 'Bajo Stock' : 'En Stock';
+      const status = newIngredient.stock <= newIngredient.min_stock ? 'Bajo Stock' : 'En Stock';
       const image = newIngredient.image || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=64&q=80';
 
       const { data, error } = await supabase
@@ -90,7 +90,7 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
           return {
             ...i,
             stock: newStock,
-            status: newStock <= i.minStock ? 'Bajo Stock' : 'En Stock'
+            status: newStock <= i.min_stock ? 'Bajo Stock' : 'En Stock'
           };
         }
         return i;

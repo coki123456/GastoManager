@@ -96,7 +96,7 @@ const Inventory: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4"><span className={`font-bold ${item.status === 'Bajo Stock' ? 'text-red-500' : 'text-text-main'}`}>{item.stock} {item.unit}</span></td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{item.minStock} {item.unit}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{item.min_stock} {item.unit}</td>
                   <td className="px-6 py-4 text-sm font-medium">${item.price}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">{item.supplier}</td>
                   <td className="px-6 py-4">
