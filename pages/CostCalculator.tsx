@@ -349,10 +349,15 @@ const CostCalculator: React.FC = () => {
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-text-main">$</span>
                 <input
-                  className="w-full rounded-xl border-2 border-primary bg-white px-4 py-4 pl-8 text-3xl font-black text-text-main focus:outline-none"
+                  className="w-full rounded-xl border-2 border-primary bg-white px-4 py-4 pl-8 text-3xl font-black text-text-main focus:outline-none focus:ring-4 focus:ring-primary/20 transition-all"
                   type="number"
                   value={suggestedPrice.toFixed(2)}
-                  readOnly
+                  onChange={(e) => {
+                    const newPrice = parseFloat(e.target.value);
+                    if (!isNaN(newPrice) && totalCost > 0) {
+                      setMultiplier(newPrice / totalCost);
+                    }
+                  }}
                 />
               </div>
             </div>

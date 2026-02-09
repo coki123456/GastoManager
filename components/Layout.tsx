@@ -13,11 +13,23 @@ import {
 } from 'lucide-react';
 import { Toaster } from 'sonner';
 
+import { supabase } from '../lib/supabase';
+
 const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [userEmail, setUserEmail] = React.useState('Usuario');
 
-  const handleLogout = () => {
+  React.useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user?.email) {
+        setUserEmail(data.user.email.split('@')[0]); // Use part before @ as name
+      }
+    });
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     navigate('/login');
   };
 
@@ -84,12 +96,12 @@ const Sidebar: React.FC = () => {
             <img
               alt="Profile"
               className="h-full w-full object-cover"
-              src="https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-4.0.3&auto=format&fit=crop&w=256&q=80"
+              src={`https://ui-avatars.com/api/?name=${userEmail}&background=2bee7c&color=fff`}
             />
           </div>
           <div className="flex flex-col overflow-hidden">
-            <p className="truncate text-sm font-bold text-text-main">Carlos Rivera</p>
-            <p className="truncate text-xs text-text-secondary">Chef Ejecutivo</p>
+            <p className="truncate text-sm font-bold text-text-main capitalize">{userEmail}</p>
+            <p className="truncate text-xs text-text-secondary">Administrador</p>
           </div>
           <button onClick={handleLogout} className="ml-auto text-gray-400 hover:text-red-500 transition-colors">
             <LogOut size={18} />
