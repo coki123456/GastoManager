@@ -8,8 +8,8 @@ import Inventory from './pages/Inventory';
 import CostCalculator from './pages/CostCalculator';
 import POS from './pages/POS';
 import SalesHistory from './pages/SalesHistory';
+import RecipeList from './pages/RecipeList';
 import Settings from './pages/Settings';
-
 import ProtectedRoute from './components/ProtectedRoute';
 
 const App: React.FC = () => {
@@ -26,6 +26,7 @@ const App: React.FC = () => {
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardReports />} />
             <Route path="inventory" element={<Inventory />} />
+            <Route path="recipes" element={<RecipeList />} />
             <Route path="calculator" element={<CostCalculator />} />
             <Route path="pos" element={<POS />} />
             <Route path="sales" element={<SalesHistory />} />

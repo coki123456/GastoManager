@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Check, PlusCircle, Trash2, Calculator, Info, Search } from 'lucide-react';
+import { Save, Check, PlusCircle, Trash2, Calculator, Info, Search, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useInventoryStore } from '../store/useInventoryStore';
 import { useRecipesStore, RecipeIngredient } from '../store/useRecipesStore';
 import { Ingredient } from '../types';
@@ -12,8 +13,13 @@ interface IngredientRow extends RecipeIngredient {
 }
 
 const CostCalculator: React.FC = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const recipeIdParam = searchParams.get('recipeId');
+  const isEditing = !!recipeIdParam;
+
   const { ingredients: inventory, fetchIngredients } = useInventoryStore();
-  const { addRecipe, isLoading: isSaving } = useRecipesStore();
+  const { addRecipe, updateRecipe, recipes, fetchRecipes, isLoading: isSaving } = useRecipesStore();
 
   const [recipeName, setRecipeName] = useState('Nueva Receta');
   const [portions, setPortions] = useState(1);
@@ -26,7 +32,43 @@ const CostCalculator: React.FC = () => {
 
   useEffect(() => {
     fetchIngredients();
-  }, [fetchIngredients]);
+    if (recipes.length === 0) {
+      fetchRecipes();
+    }
+  }, [fetchIngredients, fetchRecipes, recipes.length]);
+
+  // Load Recipe Data for Editing
+  useEffect(() => {
+    if (isEditing && recipes.length > 0) {
+      const recipe = recipes.find(r => r.id === Number(recipeIdParam));
+      if (recipe) {
+        setRecipeName(recipe.name);
+        setPortions(recipe.portions);
+
+        // Map ingredients
+        const rows: IngredientRow[] = recipe.ingredients.map(ri => ({
+          ingredient_id: ri.ingredient_id,
+          name: ri.name,
+          quantity: ri.quantity,
+          unit: ri.unit,
+          cost: ri.cost, // Current cost from DB relation
+          total: ri.cost * ri.quantity,
+          icon: '📦',
+          color: 'bg-blue-100 text-blue-600'
+        }));
+        setSelectedIngredients(rows);
+
+        // Calculate multiplier based on saved price vs calculated cost
+        // We need to wait for rows to be set to calculate baseCost? 
+        // Actually better to do it here directly
+        const baseCost = rows.reduce((acc, curr) => acc + curr.total, 0);
+        const totalCost = baseCost * 1.05; // + 5% margin
+        if (totalCost > 0) {
+          setMultiplier(Number((recipe.price / totalCost).toFixed(1)));
+        }
+      }
+    }
+  }, [isEditing, recipeIdParam, recipes]);
 
   // Calculations
   const baseCost = selectedIngredients.reduce((acc, curr) => acc + curr.total, 0);
@@ -34,7 +76,7 @@ const CostCalculator: React.FC = () => {
   const totalCost = baseCost + errorMargin;
   const costPerPortion = totalCost / Math.max(1, portions);
   const suggestedPrice = totalCost * multiplier;
-  const marginPercent = ((suggestedPrice - totalCost) / suggestedPrice) * 100;
+  const marginPercent = suggestedPrice > 0 ? ((suggestedPrice - totalCost) / suggestedPrice) * 100 : 0;
   const profit = suggestedPrice - totalCost;
 
   const handleAddIngredient = (ing: Ingredient) => {
@@ -69,17 +111,24 @@ const CostCalculator: React.FC = () => {
     if (selectedIngredients.length === 0) return toast.error('Agrega al menos un ingrediente');
 
     try {
-      await addRecipe({
+      const recipeData = {
         name: recipeName,
         portions,
         price: suggestedPrice,
         ingredients: selectedIngredients
-      });
+      };
 
-      toast.success('Receta guardada exitosamente');
-      // Reset form or navigate
-      setRecipeName('Nueva Receta');
-      setSelectedIngredients([]);
+      if (isEditing) {
+        await updateRecipe(Number(recipeIdParam), recipeData);
+        toast.success('Receta actualizada exitosamente');
+      } else {
+        await addRecipe(recipeData);
+        toast.success('Receta guardada exitosamente');
+        // Reset only if adding new
+        setRecipeName('Nueva Receta');
+        setSelectedIngredients([]);
+      }
+      navigate('/recipes');
     } catch (error) {
       toast.error('Error al guardar la receta');
       console.error(error);
@@ -95,7 +144,9 @@ const CostCalculator: React.FC = () => {
     <div className="flex flex-col gap-6">
       <header className="flex items-center justify-between bg-white/80 backdrop-blur-md rounded-xl border border-gray-200 p-4 sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-4">
-          <h2 className="text-xl font-bold text-text-main">Calculadora de Costos</h2>
+          <h2 className="text-xl font-bold text-text-main">
+            {isEditing ? 'Editar Receta' : 'Calculadora de Costos'}
+          </h2>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -110,7 +161,7 @@ const CostCalculator: React.FC = () => {
               </>
             ) : (
               <>
-                <Save size={18} /> Guardar Receta
+                <Save size={18} /> {isEditing ? 'Actualizar Receta' : 'Guardar Receta'}
               </>
             )}
           </button>
@@ -316,5 +367,4 @@ const CostCalculator: React.FC = () => {
     </div>
   );
 };
-
 export default CostCalculator;

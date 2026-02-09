@@ -25,6 +25,7 @@ interface RecipesState {
     error: string | null;
     fetchRecipes: () => Promise<void>;
     addRecipe: (recipe: Omit<Recipe, 'id'>) => Promise<void>;
+    updateRecipe: (id: number, recipe: Omit<Recipe, 'id'>) => Promise<void>;
     deleteRecipe: (id: number) => Promise<void>;
 }
 
@@ -68,6 +69,57 @@ export const useRecipesStore = create<RecipesState>((set, get) => ({
             }));
 
             set({ recipes });
+        } catch (error: any) {
+            set({ error: error.message });
+        } finally {
+            set({ isLoading: false });
+        }
+    },
+
+
+
+    updateRecipe: async (id, updatedRecipe) => {
+        set({ isLoading: true, error: null });
+        try {
+            // 1. Update Recipe Details
+            const { error: recipeError } = await supabase
+                .from('recipes')
+                .update({
+                    name: updatedRecipe.name,
+                    portions: updatedRecipe.portions,
+                    price: updatedRecipe.price
+                })
+                .eq('id', id);
+
+            if (recipeError) throw recipeError;
+
+            // 2. Clear existing ingredients
+            const { error: deleteError } = await supabase
+                .from('recipe_ingredients')
+                .delete()
+                .eq('recipe_id', id);
+
+            if (deleteError) throw deleteError;
+
+            // 3. Insert New Ingredients
+            const recipeIngredients = updatedRecipe.ingredients.map(ing => ({
+                recipe_id: id,
+                ingredient_id: ing.ingredient_id,
+                quantity: ing.quantity,
+                unit: ing.unit
+            }));
+
+            if (recipeIngredients.length > 0) {
+                const { error: insertError } = await supabase
+                    .from('recipe_ingredients')
+                    .insert(recipeIngredients);
+
+                if (insertError) throw insertError;
+            }
+
+            // Reload
+            await get().fetchRecipes();
+
         } catch (error: any) {
             set({ error: error.message });
         } finally {

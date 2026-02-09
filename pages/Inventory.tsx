@@ -1,15 +1,31 @@
 import React, { useState } from 'react';
-import { Search, Plus, RefreshCw, MoreVertical, AlertTriangle, DollarSign } from 'lucide-react';
+import { Search, Plus, RefreshCw, MoreVertical, AlertTriangle, DollarSign, Edit } from 'lucide-react';
 import AddIngredientModal from '../components/AddIngredientModal';
 import { useInventoryStore } from '../store/useInventoryStore';
+import { Ingredient } from '../types';
 
 const Inventory: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedIngredient, setSelectedIngredient] = useState<Ingredient | null>(null);
   const { ingredients, fetchIngredients, isLoading } = useInventoryStore();
 
   React.useEffect(() => {
     fetchIngredients();
   }, [fetchIngredients]);
+
+  const handleOpenModal = (ingredient?: Ingredient) => {
+    if (ingredient) {
+      setSelectedIngredient(ingredient);
+    } else {
+      setSelectedIngredient(null);
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedIngredient(null);
+  };
 
   const totalValue = ingredients.reduce((acc, item) => acc + (item.stock * item.price), 0);
   const lowStockItems = ingredients.filter(item => item.status === 'Bajo Stock').length;
@@ -24,7 +40,11 @@ const Inventory: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-6">
-      <AddIngredientModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <AddIngredientModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        initialData={selectedIngredient}
+      />
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -36,7 +56,7 @@ const Inventory: React.FC = () => {
             <RefreshCw size={18} /> Actualizar Stock
           </button>
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => handleOpenModal()}
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary hover:bg-primary-dark font-bold text-text-main text-sm transition-colors shadow-sm"
           >
             <Plus size={18} /> Añadir Ingrediente
@@ -105,7 +125,18 @@ const Inventory: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button className="text-gray-400 hover:text-primary-dark transition-colors"><MoreVertical size={18} /></button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => handleOpenModal(item)}
+                        className="text-gray-400 hover:text-primary-dark transition-colors p-1"
+                        title="Editar"
+                      >
+                        <Edit size={18} />
+                      </button>
+                      <button className="text-gray-400 hover:text-red-500 transition-colors p-1">
+                        <MoreVertical size={18} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

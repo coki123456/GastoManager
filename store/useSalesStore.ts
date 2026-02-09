@@ -15,6 +15,7 @@ interface Sale {
     total: number;
     payment_method: string;
     status: string;
+    delivery_date?: string;
     items?: any[]; // Simplified for display
 }
 
@@ -23,7 +24,7 @@ interface SalesState {
     isLoading: boolean;
     error: string | null;
     fetchRecentSales: () => Promise<void>;
-    recordSale: (total: number, items: SaleItem[], paymentMethod: string) => Promise<void>;
+    recordSale: (total: number, items: SaleItem[], paymentMethod: string, deliveryDate?: Date | null) => Promise<void>;
 }
 
 export const useSalesStore = create<SalesState>((set, get) => ({
@@ -56,7 +57,7 @@ export const useSalesStore = create<SalesState>((set, get) => ({
         }
     },
 
-    recordSale: async (total, items, paymentMethod) => {
+    recordSale: async (total, items, paymentMethod, deliveryDate = null) => {
         set({ isLoading: true, error: null });
         try {
             // Prepare items for RPC (ensure matches JSONB structure)
@@ -67,12 +68,20 @@ export const useSalesStore = create<SalesState>((set, get) => ({
                 price: item.price
             }));
 
+            // Determine status
+            // If delivery date is set, assume pending unless user explicitly set it? 
+            // For now, logic: if delivery date is provided, it's a reservation -> pending.
+            // If no date, it's a direct sale -> completed.
+            const status = deliveryDate ? 'pending' : 'completed';
+
             // Call Postgres Function
             const { error } = await supabase
                 .rpc('record_sale_transaction', {
                     p_total: total,
                     p_payment_method: paymentMethod,
-                    p_items: rpcItems
+                    p_items: rpcItems,
+                    p_delivery_date: deliveryDate ? deliveryDate.toISOString() : null,
+                    p_status: status
                 });
 
             if (error) throw error;

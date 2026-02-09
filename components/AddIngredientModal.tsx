@@ -18,13 +18,17 @@ const ingredientSchema = z.object({
 
 type IngredientFormValues = z.infer<typeof ingredientSchema>;
 
+import { Ingredient } from '../types';
+
 interface AddIngredientModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialData?: Ingredient | null;
 }
 
-const AddIngredientModal: React.FC<AddIngredientModalProps> = ({ isOpen, onClose }) => {
+const AddIngredientModal: React.FC<AddIngredientModalProps> = ({ isOpen, onClose, initialData }) => {
   const addIngredient = useInventoryStore(state => state.addIngredient);
+  const updateIngredient = useInventoryStore(state => state.updateIngredient);
 
   const {
     register,
@@ -41,18 +45,56 @@ const AddIngredientModal: React.FC<AddIngredientModalProps> = ({ isOpen, onClose
     }
   });
 
-  const onSubmit = (data: IngredientFormValues) => {
-    addIngredient({
-      name: data.name,
-      category: data.category,
-      unit: data.unit,
-      stock: data.stock,
-      min_stock: data.min_stock,
-      price: data.price,
-      supplier: data.supplier || 'Sin Proveedor',
-      image: '' // Se asignará una imagen por defecto en el store
-    });
-    reset();
+  // Reset form when initialData changes or modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      if (initialData) {
+        reset({
+          name: initialData.name,
+          category: initialData.category,
+          unit: initialData.unit,
+          stock: initialData.stock,
+          min_stock: initialData.min_stock,
+          price: initialData.price,
+          supplier: initialData.supplier || '',
+        });
+      } else {
+        reset({
+          name: '',
+          category: '',
+          unit: 'Kg',
+          stock: 0,
+          min_stock: 5,
+          price: 0,
+          supplier: ''
+        });
+      }
+    }
+  }, [isOpen, initialData, reset]);
+
+  const onSubmit = async (data: IngredientFormValues) => {
+    if (initialData) {
+      await updateIngredient(initialData.id, {
+        name: data.name,
+        category: data.category,
+        unit: data.unit,
+        stock: data.stock,
+        min_stock: data.min_stock,
+        price: data.price,
+        supplier: data.supplier || 'Sin Proveedor',
+      });
+    } else {
+      await addIngredient({
+        name: data.name,
+        category: data.category,
+        unit: data.unit,
+        stock: data.stock,
+        min_stock: data.min_stock,
+        price: data.price,
+        supplier: data.supplier || 'Sin Proveedor',
+        image: ''
+      });
+    }
     onClose();
   };
 
@@ -76,9 +118,11 @@ const AddIngredientModal: React.FC<AddIngredientModalProps> = ({ isOpen, onClose
           <div className="flex flex-col gap-1">
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-text-main flex items-center gap-2">
               <Carrot className="text-primary-dark" size={28} />
-              Añadir Nuevo Ingrediente
+              {initialData ? 'Editar Ingrediente' : 'Añadir Nuevo Ingrediente'}
             </h1>
-            <p className="text-sm text-gray-500">Complete los detalles para registrar un nuevo insumo en el inventario.</p>
+            <p className="text-sm text-gray-500">
+              {initialData ? 'Modifique los detalles del insumo.' : 'Complete los detalles para registrar un nuevo insumo.'}
+            </p>
           </div>
           <button
             type="button"
@@ -234,7 +278,7 @@ const AddIngredientModal: React.FC<AddIngredientModalProps> = ({ isOpen, onClose
             className="px-6 py-3 rounded-lg text-sm font-bold text-text-main bg-primary hover:bg-primary-dark shadow-lg shadow-primary/20 transition-all flex items-center gap-2 disabled:opacity-50"
           >
             <Check size={20} />
-            {isSubmitting ? 'Guardando...' : 'Guardar Ingrediente'}
+            {isSubmitting ? 'Guardando...' : (initialData ? 'Actualizar Ingrediente' : 'Guardar Ingrediente')}
           </button>
         </div>
       </form>

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, History, Search } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, History, Search, Calendar, AlertTriangle, Edit2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSalesStore } from '../store/useSalesStore';
 import { useRecipesStore } from '../store/useRecipesStore';
+import { useInventoryStore } from '../store/useInventoryStore';
 
 interface CartItem {
   id: string; // temp id for cart
@@ -15,18 +16,32 @@ interface CartItem {
 const POS: React.FC = () => {
   const { recentSales, fetchRecentSales, recordSale } = useSalesStore();
   const { recipes, fetchRecipes } = useRecipesStore();
+  const { ingredients: inventory, fetchIngredients } = useInventoryStore();
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Efectivo');
+  const [deliveryDate, setDeliveryDate] = useState<string>('');
 
   useEffect(() => {
     fetchRecentSales();
     fetchRecipes();
-  }, [fetchRecentSales, fetchRecipes]);
+    fetchIngredients();
+  }, [fetchRecentSales, fetchRecipes, fetchIngredients]);
 
   const addToCart = (recipe: any) => {
+    // Basic stock check warning (optional, blocking might be too strict)
     const existing = cart.find(item => item.recipe_id === recipe.id);
+    const newQty = (existing?.quantity || 0) + 1;
+
+    // Check stock availability
+    const missing = getMissingIngredients(recipe.id, newQty);
+    if (missing.length > 0) {
+      toast.warning(`Atención: Falta stock para ${recipe.name}`, {
+        description: `Falta: ${missing.map(m => m.name).join(', ')}`
+      });
+    }
+
     if (existing) {
       setCart(cart.map(item =>
         item.recipe_id === recipe.id
@@ -54,12 +69,53 @@ const POS: React.FC = () => {
     }));
   };
 
+  const updatePrice = (id: string, newPrice: number) => {
+    setCart(cart.map(item => item.id === id ? { ...item, price: newPrice } : item));
+  };
+
   const removeFromCart = (id: string) => {
     setCart(cart.filter(item => item.id !== id));
   };
 
+  const getMissingIngredients = (recipeId: number | undefined, qty: number) => {
+    if (!recipeId) return [];
+    const recipe = recipes.find(r => r.id === recipeId);
+    if (!recipe) return [];
+
+    const missing: { name: string }[] = [];
+    recipe.ingredients.forEach(ri => {
+      const invItem = inventory.find(i => i.id === ri.ingredient_id);
+      const required = ri.quantity * qty;
+      const current = invItem?.stock || 0;
+      if (current < required) {
+        missing.push({ name: ri.name });
+      }
+    });
+    return missing;
+  };
+
   const handleCheckout = async () => {
     if (cart.length === 0) return;
+
+    // Final Stock Check
+    const allMissing: string[] = [];
+    cart.forEach(item => {
+      const missing = getMissingIngredients(item.recipe_id, item.quantity);
+      if (missing.length > 0) {
+        allMissing.push(`${item.name} (Falta: ${missing.map(m => m.name).join(', ')})`);
+      }
+    });
+
+    if (allMissing.length > 0) {
+      toast.error('No hay suficiente stock', {
+        description: allMissing.join('\n')
+      });
+      // We allow creating pending sales (reservations) even without stock?
+      // Maybe yes, but standard sales no. 
+      // User asked: "sales planning (see required)".
+      // If delivery date is set (Reservation), maybe we allow it?
+      if (!deliveryDate) return;
+    }
 
     const total = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     const saleItems = cart.map(item => ({
@@ -70,10 +126,12 @@ const POS: React.FC = () => {
     }));
 
     try {
-      await recordSale(total, saleItems, paymentMethod);
+      const dateObj = deliveryDate ? new Date(deliveryDate) : null;
+      await recordSale(total, saleItems, paymentMethod, dateObj);
       setCart([]);
-      toast.success('Venta registrada correctamente', {
-        description: `Total: $${total.toFixed(2)} - ${paymentMethod}`
+      setDeliveryDate('');
+      toast.success(deliveryDate ? 'Reserva creada' : 'Venta registrada properly', {
+        description: `Total: $${total.toFixed(2)} - ${deliveryDate ? 'Pendiente' : 'Completada'}`
       });
     } catch (err) {
       toast.error('Error al registrar venta');
@@ -144,22 +202,52 @@ const POS: React.FC = () => {
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {cart.map(item => (
-              <div key={item.id} className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-100">
-                <div className="flex-1">
-                  <div className="font-bold text-sm text-text-main line-clamp-1">{item.name}</div>
-                  <div className="text-xs text-gray-500">${item.price.toFixed(2)} c/u</div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
-                    <button onClick={() => updateQuantity(item.id, -1)} className="p-1 hover:bg-white rounded shadow-sm"><Minus size={14} /></button>
-                    <span className="text-sm font-bold w-4 text-center">{item.quantity}</span>
-                    <button onClick={() => updateQuantity(item.id, 1)} className="p-1 hover:bg-white rounded shadow-sm"><Plus size={14} /></button>
+            {cart.map(item => {
+              const missing = getMissingIngredients(item.recipe_id, item.quantity);
+              const hasStockIssue = missing.length > 0;
+              return (
+                <div key={item.id} className={`flex flex-col bg-white p-2 rounded-lg border ${hasStockIssue ? 'border-red-200 bg-red-50' : 'border-gray-100'}`}>
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex-1">
+                      <div className="font-bold text-sm text-text-main line-clamp-1">{item.name}</div>
+
+                      {/* Bulk Pricing Edit */}
+                      {item.quantity >= 3 ? (
+                        <div className="flex items-center gap-1 mt-1">
+                          <span className="text-xs text-blue-600 font-bold">Mayorista: $</span>
+                          <input
+                            className="w-16 text-xs border-b border-blue-300 bg-transparent outline-none font-bold text-blue-700"
+                            type="number"
+                            value={item.price}
+                            onChange={(e) => updatePrice(item.id, parseFloat(e.target.value))}
+                          />
+                        </div>
+                      ) : (
+                        <div className="text-xs text-gray-500">${item.price.toFixed(2)} c/u</div>
+                      )}
+
+                      {hasStockIssue && (
+                        <div className="flex items-center gap-1 text-[10px] text-red-500 font-bold mt-1">
+                          <AlertTriangle size={10} /> Falta: {missing.map(m => m.name).join(', ')}
+                        </div>
+                      )}
+                    </div>
+                    <button onClick={() => removeFromCart(item.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16} /></button>
                   </div>
-                  <button onClick={() => removeFromCart(item.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16} /></button>
+
+                  <div className="flex items-center justify-between">
+                    <div className="font-bold text-gray-700">
+                      ${(item.price * item.quantity).toFixed(2)}
+                    </div>
+                    <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
+                      <button onClick={() => updateQuantity(item.id, -1)} className="p-1 hover:bg-white rounded shadow-sm"><Minus size={14} /></button>
+                      <span className="text-sm font-bold w-4 text-center">{item.quantity}</span>
+                      <button onClick={() => updateQuantity(item.id, 1)} className="p-1 hover:bg-white rounded shadow-sm"><Plus size={14} /></button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {cart.length === 0 && (
               <div className="text-center py-10 text-gray-400 text-sm">
                 Agrega productos para comenzar una venta
@@ -168,6 +256,20 @@ const POS: React.FC = () => {
           </div>
 
           <div className="p-4 bg-gray-50 border-t border-gray-100 space-y-4">
+
+            {/* Delivery Date / Reservation */}
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">
+                <Calendar size={12} /> Fecha de Entrega (Opcional)
+              </label>
+              <input
+                type="datetime-local"
+                className="w-full text-sm p-2 rounded-lg border border-gray-200 outline-none focus:border-primary"
+                value={deliveryDate}
+                onChange={(e) => setDeliveryDate(e.target.value)}
+              />
+            </div>
+
             <div className="flex justify-between items-center">
               <span className="text-gray-500">Total a Pagar</span>
               <span className="text-2xl font-black text-text-main">${cartTotal.toFixed(2)}</span>
@@ -191,9 +293,9 @@ const POS: React.FC = () => {
             <button
               onClick={handleCheckout}
               disabled={cart.length === 0}
-              className="w-full py-3 bg-text-main hover:bg-black text-white rounded-xl font-bold text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className={`w-full py-3 text-white rounded-xl font-bold text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all ${deliveryDate ? 'bg-blue-600 hover:bg-blue-700' : 'bg-text-main hover:bg-black'}`}
             >
-              Cobrar ${cartTotal.toFixed(2)}
+              {deliveryDate ? '📅 Reservar Pedido' : `Cobrar $${cartTotal.toFixed(2)}`}
             </button>
           </div>
         </div>
@@ -207,8 +309,11 @@ const POS: React.FC = () => {
             {recentSales.map(sale => (
               <div key={sale.id} className="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded cursor-pointer">
                 <div>
-                  <div className="font-bold text-text-main mb-0.5">Venta #{sale.id}</div>
+                  <div className="font-bold text-text-main mb-0.5">
+                    {sale.status === 'pending' ? '📅 Reserva' : 'Venta'} #{sale.id}
+                  </div>
                   <div className="text-xs text-gray-400">{new Date(sale.created_at).toLocaleTimeString()} • {sale.payment_method}</div>
+                  {sale.status === 'pending' && <div className="text-[10px] text-blue-500 font-bold">Entrega: {sale.delivery_date ? new Date(sale.delivery_date || '').toLocaleDateString() : '?'}</div>}
                 </div>
                 <div className="font-bold text-green-600 bg-green-50 px-2 py-1 rounded">
                   ${sale.total.toFixed(2)}

@@ -9,7 +9,7 @@ interface InventoryState {
   fetchIngredients: () => Promise<void>;
   addIngredient: (ingredient: Omit<Ingredient, 'id' | 'status'>) => Promise<void>;
   removeIngredient: (id: number) => Promise<void>;
-  updateStock: (id: number, quantity: number) => Promise<void>;
+  updateIngredient: (id: number, ingredient: Partial<Omit<Ingredient, 'id'>>) => Promise<void>;
 }
 
 export const useInventoryStore = create<InventoryState>((set, get) => ({
@@ -51,6 +51,41 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
 
       set((state) => ({
         ingredients: [...state.ingredients, data as Ingredient]
+      }));
+    } catch (error: any) {
+      set({ error: error.message });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  updateIngredient: async (id, updatedFields) => {
+    set({ isLoading: true, error: null });
+    try {
+      // Calculate status if stock or min_stock changes
+      let status = undefined;
+      const current = get().ingredients.find(i => i.id === id);
+
+      if (current) {
+        const newStock = updatedFields.stock ?? current.stock;
+        const newMinStock = updatedFields.min_stock ?? current.min_stock;
+        status = newStock <= newMinStock ? 'Bajo Stock' : 'En Stock';
+      }
+
+      const payload: any = { ...updatedFields };
+      if (status) payload.status = status;
+
+      const { data, error } = await supabase
+        .from('ingredients')
+        .update(payload)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      set((state) => ({
+        ingredients: state.ingredients.map((i) => (i.id === id ? (data as Ingredient) : i)),
       }));
     } catch (error: any) {
       set({ error: error.message });
